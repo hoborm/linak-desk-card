@@ -1,5 +1,5 @@
 {
-    "domain": "linakdesk_card",
+    "domain": "linakdesk_card_for_ikea",
     "documentation": "https://github.com/hoborm/linak-desk-card",
     "issue_tracker":"https://github.com/hoborm/linak-desk-card",
     "codeowners": ["@hoborm"],
