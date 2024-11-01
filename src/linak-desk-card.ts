@@ -37,7 +37,8 @@ export class LinakDeskCard extends LitElement {
       const [height_sensor] = entities.filter((eid) => eid.substr(0, eid.indexOf('.')) === 'sensor' && eid.includes('desk_height'));
       const [moving_sensor] = entities.filter((eid) => eid.substr(0, eid.indexOf('.')) === 'binary_sensor' && eid.includes('desk_moving'));
       const [connection_sensor] = entities.filter((eid) => eid.substr(0, eid.indexOf('.')) === 'binary_sensor' && eid.includes('desk_connection'));
-    return {
+    
+      return {
       desk,
       height_sensor,
       moving_sensor,
@@ -46,6 +47,7 @@ export class LinakDeskCard extends LitElement {
       max_height: 127,
       presets: []
     };
+    
   }
 
   @property({ attribute: false }) public hass!: HomeAssistant;
@@ -68,10 +70,6 @@ export class LinakDeskCard extends LitElement {
   }
 
   get height(): number {
-    return this.relativeHeight + this.config.min_height;
-  }
-
-  get relativeHeight(): number {
     return parseInt(this.hass.states[this.config.height_sensor]?.state, 10) || 0;
   }
 
@@ -83,7 +81,7 @@ export class LinakDeskCard extends LitElement {
     return this.hass.states[this.config.moving_sensor]?.state === 'on';
   }
   get alpha(): number {
-    return (this.relativeHeight) / (this.config.max_height - this.config.min_height)
+    return (this.height) / (this.config.max_height - this.config.min_height)
   }
 
   protected shouldUpdate(changedProps: PropertyValues): boolean {
