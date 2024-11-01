@@ -1,0 +1,8 @@
+{
+    "domain": "linakdesk_card",
+    "documentation": "https://github.com/hoborm/linak-desk-card",
+    "issue_tracker":"https://github.com/hoborm/linak-desk-card",
+    "codeowners": ["@hoborm"],
+    "name": "LinakDesk Card for IKEA Plugin",
+    "version": "1.6.2"
+  }
