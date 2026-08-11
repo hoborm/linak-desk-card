@@ -70,10 +70,11 @@ export class LinakDeskCard extends LitElement {
 
   get displayHeight(): string {
     const heightObj = this.hass.states[this.config.height_sensor];
-    if (heightObj && this.hass.formatEntityState) {
-      return this.hass.formatEntityState(heightObj);
+    // Cast hass to any to bypass outdated custom-card-helpers typings
+    if (heightObj && (this.hass as any).formatEntityState) {
+      return (this.hass as any).formatEntityState(heightObj);
     }
-    // Fallback if formatEntityState is unavailable in older HA versions
+    // Fallback if formatEntityState is unavailable
     return `${this.rawHeight} cm`;
   }
 
