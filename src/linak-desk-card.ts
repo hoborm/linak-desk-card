@@ -64,8 +64,17 @@ export class LinakDeskCard extends LitElement {
     return this.hass.states[this.config.desk];
   }
 
-  get height(): number {
+  get rawHeight(): number {
     return parseFloat(this.hass.states[this.config.height_sensor]?.state) || 0;
+  }
+
+  get displayHeight(): string {
+    const heightObj = this.hass.states[this.config.height_sensor];
+    if (heightObj && this.hass.formatEntityState) {
+      return this.hass.formatEntityState(heightObj);
+    }
+    // Fallback if formatEntityState is unavailable in older HA versions
+    return `${this.rawHeight} cm`;
   }
 
   get connected(): boolean {
@@ -77,7 +86,8 @@ export class LinakDeskCard extends LitElement {
   }
 
   get alpha(): number {
-    const boundedHeight = Math.min(Math.max(this.height, this.config.min_height), this.config.max_height);
+    const numericHeight = this.rawHeight;
+    const boundedHeight = Math.min(Math.max(numericHeight, this.config.min_height), this.config.max_height);
     return (boundedHeight - this.config.min_height) / (this.config.max_height - this.config.min_height);
   }
 
@@ -111,10 +121,7 @@ export class LinakDeskCard extends LitElement {
           <img src="${tableTopImg}" style="transform: translateY(${this.calculateOffset(90)}px);" />
           <img src="${tableMiddleImg}" style="transform: translateY(${this.calculateOffset(60)}px);" />
           <img src="${tableBottomImg}" />
-          <div class="height" style="transform: translateY(${this.calculateOffset(90)}px);">
-            ${this.height}
-            <span>cm</span>
-          </div>
+          <div class="height" style="transform: translateY(${this.calculateOffset(90)}px);">${this.displayHeight}</div>
           <div class="knob">
             <div
               class="knob-button"
@@ -151,10 +158,9 @@ export class LinakDeskCard extends LitElement {
     return html`
       <div class="presets">
         ${presets.map(
-          (item) =>
-            html` <paper-button @click="${() => this.handlePreset(item.target)}">
-              ${item.label} - ${item.target} cm
-            </paper-button>`,
+          (item) => html` <paper-button @click="${() => this.handlePreset(item.target)}">
+            ${item.label} - ${item.target} cm
+          </paper-button>`,
         )}
       </div>
     `;
