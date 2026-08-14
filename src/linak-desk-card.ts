@@ -70,11 +70,9 @@ export class LinakDeskCard extends LitElement {
 
   get displayHeight(): string {
     const heightObj = this.hass.states[this.config.height_sensor];
-    // Cast hass to any to bypass outdated custom-card-helpers typings
     if (heightObj && (this.hass as any).formatEntityState) {
       return (this.hass as any).formatEntityState(heightObj);
     }
-    // Fallback if formatEntityState is unavailable
     return `${this.rawHeight} cm`;
   }
 
@@ -87,8 +85,7 @@ export class LinakDeskCard extends LitElement {
   }
 
   get alpha(): number {
-    const numericHeight = this.rawHeight;
-    const boundedHeight = Math.min(Math.max(numericHeight, this.config.min_height), this.config.max_height);
+    const boundedHeight = Math.min(Math.max(this.rawHeight, this.config.min_height), this.config.max_height);
     return (boundedHeight - this.config.min_height) / (this.config.max_height - this.config.min_height);
   }
 
@@ -104,32 +101,39 @@ export class LinakDeskCard extends LitElement {
     const newHass = changedProps.get('hass') as HomeAssistant | undefined;
     if (newHass) {
       return (
-        newHass.states[this.config?.desk] !== this.hass?.states[this.config?.desk] ||
-        newHass.states[this.config.height_sensor]?.state !== this.hass?.states[this.config.height_sensor]?.state
+        newHass.states[this.config.desk] !== this.hass.states[this.config.desk] ||
+        newHass.states[this.config.height_sensor]?.state !== this.hass.states[this.config.height_sensor]?.state
       );
     }
+
     return true;
   }
 
   protected render(): TemplateResult | void {
+    const gradientTop = this.config.gradient_top_color || 'var(--primary-color)';
+    const gradientBottom = this.config.gradient_bottom_color || 'var(--dark-primary-color)';
+
     return html`
       <ha-card .header=${this.config.name}>
         <div class="connection">
           ${localize(this.connected ? 'status.connected' : 'status.disconnected')}
           <div class="indicator ${this.connected ? 'connected' : 'disconnected'}"></div>
         </div>
-        <div class="preview">
+
+        <div class="preview" style="--desk-gradient-top: ${gradientTop}; --desk-gradient-bottom: ${gradientBottom};">
           <img src="${tableTopImg}" style="transform: translateY(${this.calculateOffset(90)}px);" />
           <img src="${tableMiddleImg}" style="transform: translateY(${this.calculateOffset(60)}px);" />
           <img src="${tableBottomImg}" />
+
           <div class="height" style="transform: translateY(${this.calculateOffset(90)}px);">${this.displayHeight}</div>
+
           <div class="knob">
             <div
               class="knob-button"
-              @touchstart="${this.goUp}"
-              @mousedown="${this.goUp}"
-              @touchend="${this.stop}"
-              @mouseup="${this.stop}"
+              @touchstart=${this.goUp}
+              @mousedown=${this.goUp}
+              @touchend=${this.stop}
+              @mouseup=${this.stop}
             >
               <ha-icon icon="mdi:chevron-up"></ha-icon>
             </div>
@@ -143,6 +147,7 @@ export class LinakDeskCard extends LitElement {
               <ha-icon icon="mdi:chevron-down"></ha-icon>
             </div>
           </div>
+
           ${this.renderPresets()}
         </div>
       </ha-card>
@@ -154,14 +159,14 @@ export class LinakDeskCard extends LitElement {
   }
 
   renderPresets(): TemplateResult {
-    const presets = this.config.presets || [];
-
     return html`
       <div class="presets">
-        ${presets.map(
-          (item) => html` <paper-button @click="${() => this.handlePreset(item.target)}">
-            ${item.label} - ${item.target} cm
-          </paper-button>`,
+        ${(this.config.presets || []).map(
+          (item) => html`
+            <paper-button @click=${() => this.handlePreset(item.target)}>
+              ${item.label} - ${item.target} cm
+            </paper-button>
+          `,
         )}
       </div>
     `;
@@ -172,10 +177,10 @@ export class LinakDeskCard extends LitElement {
       return;
     }
 
-    const travelDist = this.config.max_height - this.config.min_height;
-    const positionInPercent = Math.round(((target - this.config.min_height) / travelDist) * 100);
+    const travelDistance = this.config.max_height - this.config.min_height;
+    const position = Math.round(((target - this.config.min_height) / travelDistance) * 100);
 
-    this.callService('set_cover_position', { position: positionInPercent });
+    this.callService('set_cover_position', { position });
   }
 
   private goUp(): void {
@@ -190,7 +195,7 @@ export class LinakDeskCard extends LitElement {
     this.callService('stop_cover');
   }
 
-  private callService(service, options = {}): void {
+  private callService(service: string, options = {}): void {
     this.hass.callService('cover', service, {
       entity_id: this.config.desk,
       ...options,
@@ -203,112 +208,133 @@ export class LinakDeskCard extends LitElement {
         display: flex;
         flex: 1;
         flex-direction: column;
+        height: 100%;
       }
+
       ha-card {
+        display: flex;
+        flex: 1;
         flex-direction: column;
+        height: 100%;
+        position: relative;
+        padding: 0;
+        border-radius: var(--ha-card-border-radius, 12px);
+        overflow: hidden;
+      }
+
+      .preview {
+        display: flex;
         flex: 1;
         position: relative;
-        padding: 0px;
-        border-radius: 4px;
-        overflow: hidden;
-      }
-      .preview {
-        background: linear-gradient(to bottom, var(--primary-color), var(--dark-primary-color));
-        overflow: hidden;
-        position: relative;
+        width: 100%;
         min-height: 365px;
+        overflow: hidden;
+        background: linear-gradient(to bottom, var(--desk-gradient-top), var(--desk-gradient-bottom));
       }
+
       .preview img {
         position: absolute;
-        bottom: 0px;
-        transition: all 0.2s linear;
+        bottom: 0;
+        transition: transform 0.2s linear;
       }
+
       .preview .knob {
-        background: #fff;
         position: absolute;
         display: flex;
         flex-direction: column;
         left: 20px;
         bottom: 12px;
-        border-radius: 35px;
         width: 50px;
-        overflow: hidden;
         height: 120px;
-        box-shadow: 0px 0px 36px darkslategrey;
+        overflow: hidden;
+        border-radius: 35px;
+        background: #fff;
+        box-shadow: 0 0 36px rgba(0, 0, 0, 0.3);
       }
+
       .preview .knob .knob-button {
         display: flex;
-        justify-content: center;
-        align-items: center;
         flex: 1;
+        align-items: center;
+        justify-content: center;
       }
+
       .preview .knob .knob-button ha-icon {
         color: #030303;
         cursor: pointer;
       }
+
       .preview .knob .knob-button:active {
         background: rgba(0, 0, 0, 0.06);
       }
+
       .height {
         position: absolute;
-        left: 30px;
         top: 60px;
+        left: 30px;
+        color: var(--text-primary-color, #fff);
         font-size: 32px;
         font-weight: bold;
-        transition: all 0.2s linear;
+        transition: transform 0.2s linear;
       }
-      .height span {
-        opacity: 0.6;
-      }
+
       .presets {
         position: absolute;
+        top: 10%;
+        right: 5%;
         display: flex;
         flex-direction: column;
         justify-content: space-around;
         width: 36%;
         min-width: 120px;
         height: 80%;
-        right: 5%;
-        top: 10%;
       }
 
       .presets > paper-button {
+        display: flex;
+        align-items: center;
+        justify-content: center;
         height: 40px;
         margin-bottom: 5px;
-        background-color: white;
         border-radius: 20px;
-        box-shadow: darkslategrey 0px 0px 36px;
-        display: flex;
-        justify-content: center;
-        align-items: center;
+        background-color: rgba(255, 255, 255, 0.15);
+        color: var(--text-primary-color, #fff);
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
         cursor: pointer;
-        color: rgb(3, 3, 3);
-        font-size: 18px;
+        font-size: 16px;
         font-weight: 500;
+        transition: background-color 0.2s;
+        backdrop-filter: blur(4px);
+        -webkit-backdrop-filter: blur(4px);
+      }
+
+      .presets > paper-button:hover {
+        background-color: rgba(255, 255, 255, 0.25);
       }
 
       .connection {
         position: absolute;
+        top: 10px;
+        right: 12px;
+        z-index: 10;
         display: flex;
         align-items: center;
-        right: 12px;
-        top: 10px;
-        color: var(--text-primary-color);
-        z-index: 1;
+        color: var(--text-primary-color, #fff);
       }
 
       .connection .indicator {
-        margin-left: 10px;
-        height: 10px;
         width: 10px;
+        height: 10px;
+        margin-left: 10px;
         border-radius: 50%;
       }
 
       .indicator.connected {
-        background-color: green;
+        background-color: #4caf50;
       }
+
       .indicator.disconnected {
-        background-color: red;
+        background-color: #f44336;
       }
     `;
   }

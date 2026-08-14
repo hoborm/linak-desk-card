@@ -12,6 +12,10 @@ import { HomeAssistant, LovelaceCardEditor } from 'custom-card-helpers';
 import { LinakDeskCardConfig } from './types';
 import { localize } from './localize/localize';
 
+type ColorInput = HTMLInputElement & {
+  configValue?: keyof LinakDeskCardConfig;
+};
+
 @customElement('linak-desk-card-editor')
 export class LinakDeskCardEditor extends LitElement implements LovelaceCardEditor {
   @property({ attribute: false }) public hass?: HomeAssistant;
@@ -66,12 +70,37 @@ export class LinakDeskCardEditor extends LitElement implements LovelaceCardEdito
           @value-changed=${this._valueChanged}
         ></ha-form>
 
+        <div class="palette-container">
+          <h4>Color palette</h4>
+
+          <div class="color-row">
+            <label for="gradient-top-color">Gradient top</label>
+            <input
+              id="gradient-top-color"
+              type="color"
+              .value=${this._config.gradient_top_color || '#03a9f4'}
+              .configValue=${'gradient_top_color'}
+              @change=${this._colorChanged}
+            />
+          </div>
+
+          <div class="color-row">
+            <label for="gradient-bottom-color">Gradient bottom</label>
+            <input
+              id="gradient-bottom-color"
+              type="color"
+              .value=${this._config.gradient_bottom_color || '#0288d1'}
+              .configValue=${'gradient_bottom_color'}
+              @change=${this._colorChanged}
+            />
+          </div>
+        </div>
+
         <div class="presets-container">
           <h4>${localize('editor.presets') || 'Presets'}</h4>
           ${(this._config.presets || []).map(
             (p, i) => html`
               <div class="preset">
-                <!-- Replaced ha-textfield with ha-input for modern HA -->
                 <ha-input
                   .hint=${'Label'}
                   .value=${p.label}
@@ -95,7 +124,10 @@ export class LinakDeskCardEditor extends LitElement implements LovelaceCardEdito
               </div>
             `,
           )}
-          <div class="add-preset" @click=${this.addPreset}><ha-icon icon="mdi:plus"></ha-icon> Add Preset</div>
+          <div class="add-preset" @click=${this.addPreset}>
+            <ha-icon icon="mdi:plus"></ha-icon>
+            Add Preset
+          </div>
         </div>
       </div>
     `;
@@ -103,7 +135,7 @@ export class LinakDeskCardEditor extends LitElement implements LovelaceCardEdito
 
   private _presetChanged(ev: any): void {
     const target = ev.target;
-    const value = target.type === 'number' ? parseInt(target.value) || 0 : target.value;
+    const value = target.type === 'number' ? parseInt(target.value, 10) || 0 : target.value;
 
     const newPresets = [...(this._config.presets || [])];
     newPresets[target.presetIndex] = {
@@ -119,7 +151,22 @@ export class LinakDeskCardEditor extends LitElement implements LovelaceCardEdito
     this.fireConfigChangeEvent();
   }
 
-  private fireConfigChangeEvent() {
+  private _colorChanged(ev: Event): void {
+    const target = ev.target as ColorInput;
+
+    if (!target.configValue) {
+      return;
+    }
+
+    this._config = {
+      ...this._config,
+      [target.configValue]: target.value,
+    };
+
+    this.fireConfigChangeEvent();
+  }
+
+  private fireConfigChangeEvent(): void {
     this.dispatchEvent(new CustomEvent('config-changed', { detail: { config: this._config } }));
   }
 
@@ -128,17 +175,15 @@ export class LinakDeskCardEditor extends LitElement implements LovelaceCardEdito
       return;
     }
 
-    const newConfig = ev.detail.value;
-
     this._config = {
       ...this._config,
-      ...newConfig,
+      ...ev.detail.value,
     };
 
     this.fireConfigChangeEvent();
   }
 
-  addPreset(): void {
+  public addPreset(): void {
     this._config = {
       ...this._config,
       presets: [...(this._config.presets || []), { label: 'New Preset', target: 62 }],
@@ -146,7 +191,7 @@ export class LinakDeskCardEditor extends LitElement implements LovelaceCardEdito
     this.fireConfigChangeEvent();
   }
 
-  removePreset(ev: any): void {
+  public removePreset(ev: any): void {
     const index = ev.currentTarget.presetIndex;
     this._config = {
       ...this._config,
@@ -157,33 +202,58 @@ export class LinakDeskCardEditor extends LitElement implements LovelaceCardEdito
 
   static get styles(): CSSResult {
     return css`
+      .palette-container,
       .presets-container {
         margin-top: 24px;
       }
+
       h4 {
-        margin-bottom: 12px;
-        margin-top: 0;
+        margin: 0 0 12px;
       }
+
+      .color-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        min-height: 44px;
+      }
+
+      .color-row label {
+        color: var(--primary-text-color);
+      }
+
+      .color-row input[type='color'] {
+        width: 48px;
+        height: 32px;
+        padding: 0;
+        border: 0;
+        border-radius: 6px;
+        background: transparent;
+        cursor: pointer;
+      }
+
       .preset {
         display: flex;
         flex-direction: row;
         align-items: flex-start;
-        position: relative; /* Anchor for the absolute positioned icon */
+        position: relative;
         gap: 16px;
         margin-bottom: 8px;
-        padding-right: 48px; /* Leave space on the right for the X button */
+        padding-right: 48px;
       }
+
       .preset > ha-input {
         flex: 1;
       }
+
       ha-icon-button {
         color: var(--secondary-text-color);
-        /* Mathematically force the X to the middle of the text input area */
         position: absolute;
         right: -8px;
-        top: 8px; /* Pushes it down exactly to the vertical center of the text fields */
+        top: 8px;
         --mdc-icon-button-size: 40px;
       }
+
       .add-preset {
         display: inline-flex;
         align-items: center;
@@ -196,6 +266,7 @@ export class LinakDeskCardEditor extends LitElement implements LovelaceCardEdito
         user-select: none;
         -webkit-user-select: none;
       }
+
       .add-preset:hover {
         text-decoration: underline;
       }
