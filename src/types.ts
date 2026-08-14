@@ -14,4 +14,5 @@ export interface LinakDeskCardConfig {
   gradient_top_color?: string;
   gradient_bottom_color?: string;
   text_color?: string;
+  hide_preset_height?: boolean;
 }

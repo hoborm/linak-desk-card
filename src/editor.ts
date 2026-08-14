@@ -51,6 +51,10 @@ export class LinakDeskCardEditor extends LitElement implements LovelaceCardEdito
         required: true,
         selector: { entity: { domain: 'sensor', device_class: 'distance' } },
       },
+      {
+        name: 'hide_preset_height',
+        selector: { boolean: {} },
+      },
     ];
 
     const computeLabel = (schemaItem) => {
@@ -61,6 +65,8 @@ export class LinakDeskCardEditor extends LitElement implements LovelaceCardEdito
           return localize('editor.desk') || 'Desk Entity';
         case 'height_sensor':
           return localize('editor.height_sensor') || 'Height Sensor';
+        case 'hide_preset_height':
+          return localize('editor.hide_preset_height') || 'Hide preset height values';
         default:
           return schemaItem.name;
       }

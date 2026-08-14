@@ -36,6 +36,7 @@ const DEFAULT_CONFIG: Partial<LinakDeskCardConfig> = {
   min_height: 62,
   max_height: 127,
   presets: [],
+  hide_preset_height: false,
 };
 
 @customElement('linak-desk-card')
@@ -121,6 +122,7 @@ export class LinakDeskCard extends LitElement {
     const gradientTop = this.config.gradient_top_color || 'var(--primary-color)';
     const gradientBottom = this.config.gradient_bottom_color || 'var(--dark-primary-color)';
     const textColor = this.config.text_color || 'var(--text-primary-color, #ffffff)';
+    const hidePresetHeight = !!this.config.hide_preset_height;
 
     return html`
       <ha-card .header=${this.config.name}>
@@ -164,7 +166,7 @@ export class LinakDeskCard extends LitElement {
             </div>
           </div>
 
-          ${this.renderPresets()}
+          ${this.renderPresets(hidePresetHeight)}
         </div>
       </ha-card>
     `;
@@ -174,13 +176,13 @@ export class LinakDeskCard extends LitElement {
     return Math.round(maxValue * (1.0 - this.alpha));
   }
 
-  renderPresets(): TemplateResult {
+  renderPresets(hidePresetHeight: boolean): TemplateResult {
     return html`
       <div class="presets">
         ${(this.config.presets || []).map(
           (item) => html`
             <paper-button @click=${() => this.handlePreset(item.target)}>
-              ${item.label} - ${item.target} cm
+              ${hidePresetHeight ? item.label : `${item.label} - ${item.target} cm`}
             </paper-button>
           `,
         )}
