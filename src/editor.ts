@@ -95,7 +95,14 @@ export class LinakDeskCardEditor extends LitElement implements LovelaceCardEdito
         ></ha-form>
 
         <div class="palette-container">
-          <h4>Color palette</h4>
+          <div class="palette-header">
+            <h4>Color palette</h4>
+            <ha-button variant="outlined" @click=${this.resetColors}>
+              <ha-icon icon="mdi:palette-swatch" style="margin-right: 8px;"></ha-icon>
+              Reset colors
+            </ha-button>
+          </div>
+
           ${colors.map(
             (color) => html`
               <div class="color-row">
@@ -182,6 +189,19 @@ export class LinakDeskCardEditor extends LitElement implements LovelaceCardEdito
     this.fireConfigChangeEvent();
   }
 
+  private resetColors(): void {
+    const newConfig: LinakDeskCardConfig = {
+      ...this._config,
+    };
+
+    delete newConfig.gradient_top_color;
+    delete newConfig.gradient_bottom_color;
+    delete newConfig.text_color;
+
+    this._config = newConfig;
+    this.fireConfigChangeEvent();
+  }
+
   private fireConfigChangeEvent(): void {
     this.dispatchEvent(new CustomEvent('config-changed', { detail: { config: this._config } }));
   }
@@ -223,8 +243,15 @@ export class LinakDeskCardEditor extends LitElement implements LovelaceCardEdito
         margin-top: 24px;
       }
 
-      h4 {
-        margin: 0 0 12px;
+      .palette-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 12px;
+      }
+
+      .palette-header h4 {
+        margin: 0;
       }
 
       .color-row {
