@@ -8,7 +8,7 @@ import {
   css,
   internalProperty,
 } from 'lit-element';
-import { HomeAssistant, LovelaceCardEditor } from 'custom-card-helpers';
+import { HomeAssistant, LovelaceCardEditor, LovelaceCardConfig } from 'custom-card-helpers';
 import { LinakDeskCardConfig } from './types';
 import { localize } from './localize/localize';
 
@@ -16,13 +16,19 @@ type ColorInput = HTMLInputElement & {
   configValue?: keyof LinakDeskCardConfig;
 };
 
+type ColorOption = {
+  configValue: keyof LinakDeskCardConfig;
+  label: string;
+  fallback: string;
+};
+
 @customElement('linak-desk-card-editor')
 export class LinakDeskCardEditor extends LitElement implements LovelaceCardEditor {
   @property({ attribute: false }) public hass?: HomeAssistant;
   @internalProperty() private _config!: LinakDeskCardConfig;
 
-  public setConfig(config: LinakDeskCardConfig): void {
-    this._config = config;
+  public setConfig(config: LovelaceCardConfig): void {
+    this._config = config as LinakDeskCardConfig;
   }
 
   protected render(): TemplateResult | void {
@@ -60,6 +66,24 @@ export class LinakDeskCardEditor extends LitElement implements LovelaceCardEdito
       }
     };
 
+    const colors: ColorOption[] = [
+      {
+        configValue: 'gradient_top_color',
+        label: 'Gradient top',
+        fallback: '#03a9f4',
+      },
+      {
+        configValue: 'gradient_bottom_color',
+        label: 'Gradient bottom',
+        fallback: '#0288d1',
+      },
+      {
+        configValue: 'text_color',
+        label: 'Text',
+        fallback: '#ffffff',
+      },
+    ];
+
     return html`
       <div class="card-config">
         <ha-form
@@ -72,28 +96,20 @@ export class LinakDeskCardEditor extends LitElement implements LovelaceCardEdito
 
         <div class="palette-container">
           <h4>Color palette</h4>
-
-          <div class="color-row">
-            <label for="gradient-top-color">Gradient top</label>
-            <input
-              id="gradient-top-color"
-              type="color"
-              .value=${this._config.gradient_top_color || '#03a9f4'}
-              .configValue=${'gradient_top_color'}
-              @change=${this._colorChanged}
-            />
-          </div>
-
-          <div class="color-row">
-            <label for="gradient-bottom-color">Gradient bottom</label>
-            <input
-              id="gradient-bottom-color"
-              type="color"
-              .value=${this._config.gradient_bottom_color || '#0288d1'}
-              .configValue=${'gradient_bottom_color'}
-              @change=${this._colorChanged}
-            />
-          </div>
+          ${colors.map(
+            (color) => html`
+              <div class="color-row">
+                <label for=${color.configValue}>${color.label}</label>
+                <input
+                  id=${color.configValue}
+                  type="color"
+                  .value=${this._config[color.configValue] || color.fallback}
+                  .configValue=${color.configValue}
+                  @change=${this._colorChanged}
+                />
+              </div>
+            `,
+          )}
         </div>
 
         <div class="presets-container">

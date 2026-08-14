@@ -9,7 +9,7 @@ import {
   PropertyValues,
   internalProperty,
 } from 'lit-element';
-import { HomeAssistant, LovelaceCardEditor } from 'custom-card-helpers';
+import { HomeAssistant, LovelaceCardEditor, LovelaceCardConfig } from 'custom-card-helpers';
 import type { LinakDeskCardConfig } from './types';
 import { localize } from './localize/localize';
 import { HassEntity } from 'home-assistant-js-websocket';
@@ -17,6 +17,12 @@ import tableBottomImg from './table_bottom.png';
 import tableMiddleImg from './table_middle.png';
 import tableTopImg from './table_top.png';
 import './editor';
+
+declare global {
+  interface Window {
+    customCards?: Array<{ type: string; name?: string; description?: string; preview?: boolean }>;
+  }
+}
 
 window.customCards = window.customCards || [];
 window.customCards.push({
@@ -35,11 +41,11 @@ const DEFAULT_CONFIG: Partial<LinakDeskCardConfig> = {
 @customElement('linak-desk-card')
 export class LinakDeskCard extends LitElement {
   public static async getConfigElement(): Promise<LovelaceCardEditor> {
-    return document.createElement('linak-desk-card-editor');
+    return document.createElement('linak-desk-card-editor') as LovelaceCardEditor;
   }
 
-  public static getStubConfig(): Partial<LinakDeskCardConfig> {
-    return { ...DEFAULT_CONFIG };
+  public static getStubConfig(): LovelaceCardConfig {
+    return ({ ...DEFAULT_CONFIG } as unknown) as LovelaceCardConfig;
   }
 
   @property({ attribute: false }) public hass!: HomeAssistant;
@@ -85,8 +91,10 @@ export class LinakDeskCard extends LitElement {
   }
 
   get alpha(): number {
-    const boundedHeight = Math.min(Math.max(this.rawHeight, this.config.min_height), this.config.max_height);
-    return (boundedHeight - this.config.min_height) / (this.config.max_height - this.config.min_height);
+    const minH = this.config.min_height ?? DEFAULT_CONFIG.min_height!;
+    const maxH = this.config.max_height ?? DEFAULT_CONFIG.max_height!;
+    const boundedHeight = Math.min(Math.max(this.rawHeight, minH), maxH);
+    return (boundedHeight - minH) / (maxH - minH);
   }
 
   protected shouldUpdate(changedProps: PropertyValues): boolean {
@@ -112,6 +120,7 @@ export class LinakDeskCard extends LitElement {
   protected render(): TemplateResult | void {
     const gradientTop = this.config.gradient_top_color || 'var(--primary-color)';
     const gradientBottom = this.config.gradient_bottom_color || 'var(--dark-primary-color)';
+    const textColor = this.config.text_color || 'var(--text-primary-color, #ffffff)';
 
     return html`
       <ha-card .header=${this.config.name}>
@@ -120,7 +129,14 @@ export class LinakDeskCard extends LitElement {
           <div class="indicator ${this.connected ? 'connected' : 'disconnected'}"></div>
         </div>
 
-        <div class="preview" style="--desk-gradient-top: ${gradientTop}; --desk-gradient-bottom: ${gradientBottom};">
+        <div
+          class="preview"
+          style="
+            --desk-gradient-top: ${gradientTop};
+            --desk-gradient-bottom: ${gradientBottom};
+            --desk-text-color: ${textColor};
+          "
+        >
           <img src="${tableTopImg}" style="transform: translateY(${this.calculateOffset(90)}px);" />
           <img src="${tableMiddleImg}" style="transform: translateY(${this.calculateOffset(60)}px);" />
           <img src="${tableBottomImg}" />
@@ -173,12 +189,15 @@ export class LinakDeskCard extends LitElement {
   }
 
   handlePreset(target: number): void {
-    if (target > this.config.max_height || target < this.config.min_height) {
+    const minH = this.config.min_height ?? DEFAULT_CONFIG.min_height!;
+    const maxH = this.config.max_height ?? DEFAULT_CONFIG.max_height!;
+
+    if (target > maxH || target < minH) {
       return;
     }
 
-    const travelDistance = this.config.max_height - this.config.min_height;
-    const position = Math.round(((target - this.config.min_height) / travelDistance) * 100);
+    const travelDistance = maxH - minH;
+    const position = Math.round(((target - minH) / travelDistance) * 100);
 
     this.callService('set_cover_position', { position });
   }
@@ -272,7 +291,7 @@ export class LinakDeskCard extends LitElement {
         position: absolute;
         top: 60px;
         left: 30px;
-        color: var(--text-primary-color, #fff);
+        color: var(--desk-text-color);
         font-size: 32px;
         font-weight: bold;
         transition: transform 0.2s linear;
@@ -298,7 +317,7 @@ export class LinakDeskCard extends LitElement {
         margin-bottom: 5px;
         border-radius: 20px;
         background-color: rgba(255, 255, 255, 0.15);
-        color: var(--text-primary-color, #fff);
+        color: var(--desk-text-color);
         box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
         cursor: pointer;
         font-size: 16px;
@@ -319,7 +338,7 @@ export class LinakDeskCard extends LitElement {
         z-index: 10;
         display: flex;
         align-items: center;
-        color: var(--text-primary-color, #fff);
+        color: var(--desk-text-color);
       }
 
       .connection .indicator {
