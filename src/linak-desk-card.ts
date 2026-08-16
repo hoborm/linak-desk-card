@@ -9,7 +9,7 @@ import {
   PropertyValues,
   internalProperty,
 } from 'lit-element';
-import { HomeAssistant, LovelaceCardEditor } from 'custom-card-helpers';
+import { HomeAssistant, LovelaceCardEditor, LovelaceCardConfig } from 'custom-card-helpers';
 import type { LinakDeskCardConfig } from './types';
 import { localize } from './localize/localize';
 import { HassEntity } from 'home-assistant-js-websocket';
@@ -17,6 +17,12 @@ import tableBottomImg from './table_bottom.png';
 import tableMiddleImg from './table_middle.png';
 import tableTopImg from './table_top.png';
 import './editor';
+
+declare global {
+  interface Window {
+    customCards?: Array<{ type: string; name?: string; description?: string; preview?: boolean }>;
+  }
+}
 
 window.customCards = window.customCards || [];
 window.customCards.push({
@@ -26,62 +32,70 @@ window.customCards.push({
   description: localize('common.description'),
 });
 
+const DEFAULT_CONFIG: Partial<LinakDeskCardConfig> = {
+  min_height: 62,
+  max_height: 127,
+  presets: [],
+  hide_preset_height: false,
+};
+
 @customElement('linak-desk-card')
 export class LinakDeskCard extends LitElement {
   public static async getConfigElement(): Promise<LovelaceCardEditor> {
-    return document.createElement('linak-desk-card-editor');
+    return document.createElement('linak-desk-card-editor') as LovelaceCardEditor;
   }
 
-  public static getStubConfig(_: HomeAssistant, entities: string[]): Partial<LinakDeskCardConfig> {
-      const [desk] = entities.filter((eid) => eid.substr(0, eid.indexOf('.')) === 'cover' && eid.includes('desk'));
-      const [height_sensor] = entities.filter((eid) => eid.substr(0, eid.indexOf('.')) === 'sensor' && eid.includes('desk_height'));
-      const [moving_sensor] = entities.filter((eid) => eid.substr(0, eid.indexOf('.')) === 'binary_sensor' && eid.includes('desk_moving'));
-      const [connection_sensor] = entities.filter((eid) => eid.substr(0, eid.indexOf('.')) === 'binary_sensor' && eid.includes('desk_connection'));
-    
-      return {
-      desk,
-      height_sensor,
-      moving_sensor,
-      connection_sensor,
-      min_height: 62,
-      max_height: 127,
-      presets: []
-    };
-    
+  public static getStubConfig(): LovelaceCardConfig {
+    return ({ ...DEFAULT_CONFIG } as unknown) as LovelaceCardConfig;
   }
 
   @property({ attribute: false }) public hass!: HomeAssistant;
   @internalProperty() private config!: LinakDeskCardConfig;
 
   public setConfig(config: LinakDeskCardConfig): void {
-    if (!config.desk || !config.height_sensor) {
-      throw new Error(localize('common.desk_and_height_required'));
+    if (!config.desk) {
+      throw new Error('Desk cover entity is required');
     }
 
-    if (!config.min_height || !config.max_height) {
-      throw new Error(localize('common.min_and_max_height_required'));
+    if (!config.height_sensor) {
+      throw new Error('Height sensor entity is required');
     }
 
-    this.config = { ...config };
+    this.config = {
+      ...DEFAULT_CONFIG,
+      ...config,
+    } as LinakDeskCardConfig;
   }
 
   get desk(): HassEntity {
     return this.hass.states[this.config.desk];
   }
 
-  get height(): number {
-    return parseInt(this.hass.states[this.config.height_sensor]?.state, 10) || 0;
+  get rawHeight(): number {
+    return parseFloat(this.hass.states[this.config.height_sensor]?.state) || 0;
+  }
+
+  get displayHeight(): string {
+    const heightObj = this.hass.states[this.config.height_sensor];
+    if (heightObj && (this.hass as any).formatEntityState) {
+      return (this.hass as any).formatEntityState(heightObj);
+    }
+    return `${this.rawHeight} cm`;
   }
 
   get connected(): boolean {
-    return this.hass.states[this.config.connection_sensor]?.state === 'on';
+    return this.desk && !['unavailable', 'unknown'].includes(this.desk.state);
   }
 
   get moving(): boolean {
-    return this.hass.states[this.config.moving_sensor]?.state === 'on';
+    return ['opening', 'closing'].includes(this.desk?.state);
   }
+
   get alpha(): number {
-    return (this.height) / (this.config.max_height - this.config.min_height)
+    const minH = this.config.min_height ?? DEFAULT_CONFIG.min_height!;
+    const maxH = this.config.max_height ?? DEFAULT_CONFIG.max_height!;
+    const boundedHeight = Math.min(Math.max(this.rawHeight, minH), maxH);
+    return (boundedHeight - minH) / (maxH - minH);
   }
 
   protected shouldUpdate(changedProps: PropertyValues): boolean {
@@ -96,80 +110,98 @@ export class LinakDeskCard extends LitElement {
     const newHass = changedProps.get('hass') as HomeAssistant | undefined;
     if (newHass) {
       return (
-        newHass.states[this.config?.desk] !== this.hass?.states[this.config?.desk]
-        || newHass.states[this.config?.connection_sensor]?.state !== this.hass?.states[this.config?.connection_sensor]?.state
-        || newHass.states[this.config?.height_sensor]?.state !== this.hass?.states[this.config?.height_sensor]?.state
-        || newHass.states[this.config?.moving_sensor]?.state !== this.hass?.states[this.config?.moving_sensor]?.state
+        newHass.states[this.config.desk] !== this.hass.states[this.config.desk] ||
+        newHass.states[this.config.height_sensor]?.state !== this.hass.states[this.config.height_sensor]?.state
       );
     }
+
     return true;
   }
 
   protected render(): TemplateResult | void {
+    const gradientTop = this.config.gradient_top_color || 'var(--primary-color)';
+    const gradientBottom = this.config.gradient_bottom_color || 'var(--dark-primary-color)';
+    const textColor = this.config.text_color || 'var(--text-primary-color, #ffffff)';
+    const hidePresetHeight = !!this.config.hide_preset_height;
+
     return html`
       <ha-card .header=${this.config.name}>
-        ${this.config.connection_sensor ? html`<div class="connection">
+        <div class="connection">
           ${localize(this.connected ? 'status.connected' : 'status.disconnected')}
-          <div class="indicator ${this.connected ? 'connected' : 'disconnected'}" ></div>
-        </div>` : html``}
-        <div class="preview">
+          <div class="indicator ${this.connected ? 'connected' : 'disconnected'}"></div>
+        </div>
+
+        <div
+          class="preview"
+          style="
+            --desk-gradient-top: ${gradientTop};
+            --desk-gradient-bottom: ${gradientBottom};
+            --desk-text-color: ${textColor};
+          "
+        >
           <img src="${tableTopImg}" style="transform: translateY(${this.calculateOffset(90)}px);" />
           <img src="${tableMiddleImg}" style="transform: translateY(${this.calculateOffset(60)}px);" />
           <img src="${tableBottomImg}" />
-          <div class="height" style="transform: translateY(${this.calculateOffset(90)}px);">
-            ${this.height}
-            <span>cm</span>
-          </div>
+
+          <div class="height" style="transform: translateY(${this.calculateOffset(90)}px);">${this.displayHeight}</div>
+
           <div class="knob">
-            <div class="knob-button" 
-                  @touchstart='${this.goUp}' 
-                  @mousedown='${this.goUp}' 
-                  @touchend='${this.stop}'
-                  @mouseup='${this.stop}'>
+            <div
+              class="knob-button"
+              @touchstart=${this.goUp}
+              @mousedown=${this.goUp}
+              @touchend=${this.stop}
+              @mouseup=${this.stop}
+            >
               <ha-icon icon="mdi:chevron-up"></ha-icon>
             </div>
-            <div class="knob-button" 
-                  @touchstart=${this.goDown} 
-                  @mousedown=${this.goDown} 
-                  @touchend=${this.stop}
-                  @mouseup=${this.stop}>
+            <div
+              class="knob-button"
+              @touchstart=${this.goDown}
+              @mousedown=${this.goDown}
+              @touchend=${this.stop}
+              @mouseup=${this.stop}
+            >
               <ha-icon icon="mdi:chevron-down"></ha-icon>
             </div>
           </div>
-          ${this.renderPresets()}
+
+          ${this.renderPresets(hidePresetHeight)}
         </div>
       </ha-card>
     `;
   }
 
   calculateOffset(maxValue: number): number {
-    return Math.round(maxValue * (1.0 - this.alpha))
+    return Math.round(maxValue * (1.0 - this.alpha));
   }
 
-  renderPresets(): TemplateResult {
-    const presets = this.config.presets || [];
-
+  renderPresets(hidePresetHeight: boolean): TemplateResult {
     return html`
-        <div class="presets">
-          ${presets.map(item => html`
-            <paper-button @click="${() => this.handlePreset(item.target)}">
-              ${item.label} - ${item.target} cm
-            </paper-button>`)} 
-        </div>
-      `;
+      <div class="presets">
+        ${(this.config.presets || []).map(
+          (item) => html`
+            <paper-button @click=${() => this.handlePreset(item.target)}>
+              ${hidePresetHeight ? item.label : `${item.label} - ${item.target} cm`}
+            </paper-button>
+          `,
+        )}
+      </div>
+    `;
   }
 
   handlePreset(target: number): void {
-    if (target > this.config.max_height) {
+    const minH = this.config.min_height ?? DEFAULT_CONFIG.min_height!;
+    const maxH = this.config.max_height ?? DEFAULT_CONFIG.max_height!;
+
+    if (target > maxH || target < minH) {
       return;
     }
 
-    const travelDist = this.config.max_height - this.config.min_height;
-    const positionInPercent = Math.round(((target - this.config.min_height) / travelDist) * 100);
+    const travelDistance = maxH - minH;
+    const position = Math.round(((target - minH) / travelDistance) * 100);
 
-    if (Number.isInteger(positionInPercent)) {
-      this.callService('set_cover_position', { position: positionInPercent });
-    }
+    this.callService('set_cover_position', { position });
   }
 
   private goUp(): void {
@@ -184,10 +216,10 @@ export class LinakDeskCard extends LitElement {
     this.callService('stop_cover');
   }
 
-  private callService(service, options = {}): void {
+  private callService(service: string, options = {}): void {
     this.hass.callService('cover', service, {
       entity_id: this.config.desk,
-      ...options
+      ...options,
     });
   }
 
@@ -197,112 +229,133 @@ export class LinakDeskCard extends LitElement {
         display: flex;
         flex: 1;
         flex-direction: column;
+        height: 100%;
       }
+
       ha-card {
+        display: flex;
+        flex: 1;
         flex-direction: column;
+        height: 100%;
+        position: relative;
+        padding: 0;
+        border-radius: var(--ha-card-border-radius, 12px);
+        overflow: hidden;
+      }
+
+      .preview {
+        display: flex;
         flex: 1;
         position: relative;
-        padding: 0px;
-        border-radius: 4px;
-        overflow: hidden;
-      }
-      .preview {
-        background: linear-gradient(to bottom, var(--primary-color), var(--dark-primary-color));
-        overflow: hidden;
-        position: relative;
+        width: 100%;
         min-height: 365px;
+        overflow: hidden;
+        background: linear-gradient(to bottom, var(--desk-gradient-top), var(--desk-gradient-bottom));
       }
+
       .preview img {
         position: absolute;
-        bottom: 0px;
-        transition: all 0.2s linear;
+        bottom: 0;
+        transition: transform 0.2s linear;
       }
+
       .preview .knob {
-        background: #fff;
         position: absolute;
         display: flex;
         flex-direction: column;
         left: 20px;
         bottom: 12px;
-        border-radius: 35px;
         width: 50px;
-        overflow: hidden;
         height: 120px;
-        box-shadow: 0px 0px 36px darkslategrey;
+        overflow: hidden;
+        border-radius: 35px;
+        background: #fff;
+        box-shadow: 0 0 36px rgba(0, 0, 0, 0.3);
       }
+
       .preview .knob .knob-button {
         display: flex;
-        justify-content: center;
-        align-items: center;
         flex: 1;
+        align-items: center;
+        justify-content: center;
       }
+
       .preview .knob .knob-button ha-icon {
         color: #030303;
         cursor: pointer;
       }
+
       .preview .knob .knob-button:active {
         background: rgba(0, 0, 0, 0.06);
       }
+
       .height {
         position: absolute;
-        left: 30px;
         top: 60px;
+        left: 30px;
+        color: var(--desk-text-color);
         font-size: 32px;
         font-weight: bold;
-        transition: all 0.2s linear;
+        transition: transform 0.2s linear;
       }
-      .height span {
-        opacity: 0.6;
-      }
+
       .presets {
         position: absolute;
+        top: 10%;
+        right: 5%;
         display: flex;
         flex-direction: column;
         justify-content: space-around;
         width: 36%;
         min-width: 120px;
         height: 80%;
-        right: 5%;
-        top: 10%;
       }
 
       .presets > paper-button {
+        display: flex;
+        align-items: center;
+        justify-content: center;
         height: 40px;
         margin-bottom: 5px;
-        background-color: white;
         border-radius: 20px;
-        box-shadow: darkslategrey 0px 0px 36px;
-        display: flex;
-        justify-content: center;
-        align-items: center;
+        background-color: rgba(255, 255, 255, 0.15);
+        color: var(--desk-text-color);
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
         cursor: pointer;
-        color: rgb(3, 3, 3);
-        font-size: 18px;
+        font-size: 16px;
         font-weight: 500;
+        transition: background-color 0.2s;
+        backdrop-filter: blur(4px);
+        -webkit-backdrop-filter: blur(4px);
+      }
+
+      .presets > paper-button:hover {
+        background-color: rgba(255, 255, 255, 0.25);
       }
 
       .connection {
         position: absolute;
+        top: 10px;
+        right: 12px;
+        z-index: 10;
         display: flex;
         align-items: center;
-        right: 12px;
-        top: 10px;
-        color: var(--text-primary-color);
-        z-index: 1;
+        color: var(--desk-text-color);
       }
 
       .connection .indicator {
-        margin-left: 10px;
-        height: 10px;
         width: 10px;
+        height: 10px;
+        margin-left: 10px;
         border-radius: 50%;
-      } 
+      }
 
       .indicator.connected {
-        background-color: green;
+        background-color: #4caf50;
       }
+
       .indicator.disconnected {
-        background-color: red;
+        background-color: #f44336;
       }
     `;
   }

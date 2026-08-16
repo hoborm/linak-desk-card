@@ -1,29 +1,18 @@
-import { LovelaceCard, LovelaceCardConfig, LovelaceCardEditor } from 'custom-card-helpers';
-declare global {
-  interface HTMLElementTagNameMap {
-    'linak-desk-card-editor': LovelaceCardEditor;
-    'hui-error-card': LovelaceCard;
-  }
-  interface Window {
-    customCards?: { 
-      type: string;
-      description: string;
-      name: string; 
-      preview?: boolean;
-    }[];
-  }
+export interface LinakDeskCardPreset {
+  label: string;
+  target: number;
 }
 
-export interface LinakDeskCardConfig extends LovelaceCardConfig {
+export interface LinakDeskCardConfig {
+  type?: string;
   name?: string;
   desk: string;
-  moving_sensor: string;
-  connection_sensor: string;
   height_sensor: string;
-  max_height: number;
-  min_height: number;
-  presets: {
-    target: number;
-    label: string;
-  }[];
+  min_height?: number;
+  max_height?: number;
+  presets?: LinakDeskCardPreset[];
+  gradient_top_color?: string;
+  gradient_bottom_color?: string;
+  text_color?: string;
+  hide_preset_height?: boolean;
 }
