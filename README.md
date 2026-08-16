@@ -6,7 +6,7 @@
 
 ![linak-desk-card_preview](/assets/linak-desk-card-preview.png)
 
-Designed to work with <https://github.com/j5lien/esphome-idasen-desk-controller>
+Designed to work with [IKEA IDÅSEN integration](https://www.home-assistant.io/integrations/idasen_desk)
 
 ## HACS
 
